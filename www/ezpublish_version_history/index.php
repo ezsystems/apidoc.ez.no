@@ -8,7 +8,7 @@
  */
 
 $startdate = strtotime( '2003/01/01' );
-$enddate = strtotime( '2014/01/01' );
+$enddate = strtotime( '2014/06/01' );
 $grapwidth = 2048;
 $series = false;
 
@@ -16,11 +16,20 @@ if ( isset( $_GET['3_x'] ) )
 {
 	$enddate = strtotime( '2009/01/01' );
 	$series = '3.';
+	$grapwidth = 1300;
 }
 elseif ( isset( $_GET['4_x'] ) )
 {
 	$startdate = strtotime( '2007/12/01' );
+	$enddate = strtotime( '2012/05/31' );
 	$series = '4.';
+	$grapwidth = 1300;
+}
+elseif ( isset( $_GET['5_x'] ) )
+{
+	$startdate = strtotime( '2012/05/31' );
+	$series = '5.';
+	$grapwidth = 1300;
 }
 
 $scale = $grapwidth / ( $enddate - $startdate ) ;
@@ -69,6 +78,23 @@ width: 100px;
 </style>
 <body>
 <h1>eZ Publish Version History</h1>
+<ul>
+<?php
+$baseURI = $_SERVER['SCRIPT_NAME'];
+$links = array( 'All series' => false,
+				'3.x series' => 3,
+				'4.x series' => 4,
+				'5.x series' => 5 );
+
+foreach( $links as $label => $code ) {
+	if ( isset( $_GET["{$code}_x"] ) or empty($_GET) && !$code  ) {
+		echo "<li>{$label}</li>";
+	} else {
+		echo "<li><a href=\"{$baseURI}?".($code?"{$code}_x":"")."\">{$label}</a></li>";
+	}
+}
+?>
+</ul>
 <table id="branchgraph">
 <tr><th>Branch</th><th>Releases</th></tr>
 <?php
@@ -123,13 +149,15 @@ foreach ( $branches as $branchname => $branchdata )
 	}
 	// should not happen: "open" branch
 	$lastdate = strtotime( end( $branchdata ) );
+	$lastdate = max( 0, min( $enddate, $lastdate ) );
 	if ( $lastdate == 0 )
 	{
 		$lastdate = $enddate;
 	}
 
 	$branchstart = round( ( $branched - $startdate ) * $scale );
-	$branchwidth = round( ( $lastdate - $branched ) * $scale );
+	$branchstart = $branchstart < 0 ? 0 : $branchstart;
+	$branchwidth = round( ( $lastdate - max($branched,$startdate)) * $scale );
 	// rounding off errors
 	if ( $branchwidth < 0 )
 	{
@@ -147,6 +175,7 @@ foreach ( $branches as $branchname => $branchdata )
 	echo "<tr><td>$branchname</td><td><ul class=\"{$class}\" style=\"left: {$branchstart}px; width: {$branchwidth}px;\" title=\"Branch: {$branchname}\">";
 	foreach ( $branchdata as $releasename => $releasedate )
 	{
+		if( strtotime($releasedate) < $startdate or strtotime($releasedate) > $enddate ) continue;
 		$releasestart = round( ( strtotime( $releasedate ) - $startdate ) * $scale ) - $branchstart;
 		$releasestart = $releasestart - 6; // correction for dot image
 		echo "<li style=\"left: {$releasestart}px;\"><a href=\"#\"><span>Release: {$releasename} ({$releasedate})</span></a></li>";
@@ -208,10 +237,15 @@ function loadCSV( $filename, $series = false )
 	{
 		//echo strtolower( $name );
 		//echo$series;
-		if ( $series && ( strpos( $name, $series ) !== 0 && ( $series != '4.' || strtolower( $name ) != 'community project' ) ) )
-		{
-			unset( $branches[$name] );
-			continue;
+		if ( $series && strpos( $name, $series ) !== 0 ) {
+			$unset = false;
+			$namelow = strtolower($name);
+			if ( $series == '3.' && $namelow != '3.' ) $unset = true;
+			elseif ( $namelow != 'community project' && $series != $namelow ) $unset = true;
+			if ( $unset ) {
+				unset( $branches[$name] );
+				continue;
+			}
 		}
 		foreach ( $array as $key => $val )
 		{
